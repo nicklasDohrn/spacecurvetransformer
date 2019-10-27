@@ -1,0 +1,52 @@
+curve size: 7411
+threads: 8
+segmentlength: 32
+points: 6352
+gesamt 0.15332
+readingCurve 0.0187566
+readingPoints 0.00336525
+processingPoints 0.0394237
+readingTriangles 0.0111455
+createTriangles 0.0711671
+writingpoints 0.0239957
+writeTriangles 0.0204904
+
+curve size: 7411
+threads: 8
+segmentlength: 1
+points: 6352
+gesamt 0.904337
+readingCurve 0.0183658
+readingPoints 0.00327028
+processingPoints 0.789914
+readingTriangles 0.0115176
+createTriangles 0.0717322
+writingpoints 0.0235088
+writeTriangles 0.0207895
+
+curve size: 7411
+threads: 8
+segmentlength: 1
+points: 2503
+gesamt 0.404523
+readingCurve 0.0196024
+readingPoints 0.00112098
+processingPoints 0.330624
+readingTriangles 0.00513256
+createTriangles 0.0410766
+writingpoints 0.0133739
+writeTriangles 0.0119802
+
+curve size: 3318
+threads: 8
+segmentlength: 1
+points: 12290
+gesamt 0.872216
+readingCurve 0.00675554
+readingPoints 0.00507569
+processingPoints 0.705494
+readingTriangles 0.0211947
+createTriangles 0.124151
+writingpoints 0.0312043
+writeTriangles 0.0306224
+
