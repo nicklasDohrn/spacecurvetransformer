@@ -50,3 +50,16 @@ createTriangles 0.124151
 writingpoints 0.0312043
 writeTriangles 0.0306224
 
+curve size: 7411
+threads: 8
+segmentlength: 1
+points: 12290
+gesamt 1.79705
+readingCurve 0.0256957
+readingPoints 0.00847342
+processingPoints 1.52273
+readingTriangles 0.0213269
+createTriangles 0.186782
+writingpoints 0.0530523
+writeTriangles 0.0532796
+
