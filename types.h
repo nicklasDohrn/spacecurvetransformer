@@ -13,6 +13,17 @@
 using namespace glm;
 using namespace std;
 
+enum filetype {
+    TRANSFORMATION = 0,
+    LIGHT_TRANSFORMED = 1,
+    LIGHT_ORIGINAL = 2
+};
+
+enum mode {
+    ABORT = -1,
+    DEFAULT = 1,
+    LIGHTPROFILE = 2
+};
 
 enum direction {
     NORMAL = 1,
@@ -25,6 +36,26 @@ struct triangle {
     vector<int> pages;
     vector<int> newPoints;
     int oldPoints[3];
+};
+
+struct profile {
+    vector<dvec3> points;
+    vector<dvec3> triangles;
+};
+
+struct progConfig {
+    int samplingStep;
+    int threads;
+    int interpolationMode;
+    int approxMode;
+    int writeMode;
+    int mode;
+    string curve;
+    string object;
+    string profile;
+    string outFile;
+    string lightTransFile;
+    string lightOrigFile;
 };
 
 struct Info{

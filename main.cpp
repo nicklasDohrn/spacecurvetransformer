@@ -13,85 +13,123 @@
 #include <chrono>
 #include "objectReader.h"
 #include "curveReader.h"
+#include "lightReader.h"
+#include "lightReader.h"
 #include "transformer.h"
 #include "timer.h"
 #include "writer.h"
+#include "types.h"
 
 using namespace std;
 using namespace glm;
 
-int defaultPrecision = 1;
-int defaultThreads = 8;
-int defaultInterpolationMode = 2;
-int defaultWriteMode = 0;
-int defaultxApprox = 1;
+progConfig conf;
+
+int handleArguments(int argc, char *argv[]) {
+
+    //Printing help message
+    if( argc < 2 || (string)argv[1] == "-h" || (string)argv[1] == "--help" ) {
+        cout << "common use:" << endl;
+        cout << "./executable <object> <curve> || ./executable <object> <curve> <profile>" << endl;
+        cout << "___________" << endl;
+        cout << "you can also specify special arguments to change the default settings:" << endl;
+        cout << "-t (--threads)         | number of threads used, can be 1 to 100, example: -t 13" << endl;
+        cout << "-s (--sampling-steps)  | the number of points skipped between two segments, example: -s 2" << endl;
+        cout << "-o (--outfile)  | the file to put the result into: -o ./out/custom_out.obj" << endl;
+        cout << "-n (--lightfile-normal)  | the file to put the lightroom for the original into: -n ./out/custom_light.obj" << endl;
+        cout << "-l (--lightfile-transformed)  | the file to put the lightroom for the trasnformation into: -l ./out/custom_light.obj" << endl;
+        return -1;
+    }
+
+    //argument handling
+    bool valid = false;
+    int argCount = 0;
+    for(int i=1; i < argc; i++) {
+        string arg = (string)argv[i];
+        if ( arg == "-t" || arg == "--threads" ) {
+            conf.threads = stoi(argv[++i]);
+        } else if (arg == "-s" || arg == "--sampling-steps" ) {
+            conf.samplingStep = stoi(argv[++i]);
+        } else if (arg == "-o" || arg == "--outfile" ) {
+            conf.outFile = argv[++i];
+        } else if (arg == "-n" || arg == "--lightfile-normal" ) {
+            conf.lightOrigFile = argv[++i];
+        } else if (arg == "-l" || arg == "--lightfile-transformed" ) {
+            conf.lightTransFile = argv[++i];
+        } else {
+            if(argCount == 0) {
+                conf.object = argv[i];
+            } else if(argCount == 1) {
+                conf.curve = argv[i];
+            } else if(argCount == 2) {
+                conf.profile = argv[i];
+            } 
+            argCount++;
+        }
+    }
+    //decision, which mode to use
+    if(argCount == 2) {
+        cout << "normal mode, to enable lightroom checking, provide profile file." << endl;
+        return mode::DEFAULT;
+    } else if(argCount == 3) {
+        cout << "enabled lightroom checking" << endl;
+        return mode::LIGHTPROFILE;
+    } else if (argCount > 3) {
+        cout << "to many arguments, make sure u used the correct flags for your arguments, see -h for more info" << endl;
+        return mode::ABORT;
+    }
+    cout << "to few arguments, see -h for more info" << endl;
+    return mode::ABORT;
+}
+
+void setDefaultValues() {
+    conf.approxMode = 1;
+    conf.interpolationMode = 2;
+    conf.threads = 8;
+    conf.samplingStep = 16;
+    conf.writeMode = 0;
+    conf.outFile = "transformed.obj";
+    conf.lightOrigFile = "light_original.obj";
+    conf.lightTransFile = "light_transformed.obj";
+}
 
 
 
 int main  (int argc, char *argv[]) {
-    int samplingStep;
-    int threads;
-    int interpolationMode;
-    int approxMode;
-    int writeMode;
-    timer::startTimer("gesamt");
-    if(argc < 8) {
-        cout << "missing at least one special argument, therefore running with default values" << endl;
-        samplingStep = defaultPrecision;
-        threads = defaultThreads;
-        interpolationMode = defaultInterpolationMode;
-        approxMode = defaultxApprox;
-        writeMode = defaultWriteMode;
-    } else { 
-        samplingStep = atoi(argv[4]);
-        threads = atoi(argv[5]);
-        interpolationMode = atoi(argv[6]);
-        approxMode = atoi(argv[7]);
-        writeMode = atoi(argv[8]);
-    }
+    setDefaultValues();
 
-    if(argc < 4) {
-        //cout << "missing arguments, at least provide: executable object curve outfile" << endl;
-        return -1;
-    }
-    timer::startTimer("readingCurve");
-    curveReader::readFromFile(argv[2]); 
-    timer::stopTimer("readingCurve");
-    vector<plane> *c = curveReader::getPlanes();
+    int transformation_mode = handleArguments(argc, argv);
 
-    timer::startTimer("readingPoints");
-    objectReader::readPointsFromFile(argv[1]); 
-    timer::stopTimer("readingPoints");
-    vector<dvec3> *p = objectReader::getPoints();
-    transformer trans;
-        
-    /*3: out file, 7: write mode
-        write modes:
-            0: obj format
-    *///        1: comparable format
-    writer::openFile(argv[3], writeMode);
-    trans = transformer();
-    /*  4: threads, 5: sampling step size, 6: interpolation mode
-        Interpolation modes: 
-            0: coordinate wise lerp
-            1: coordinate wise slerp
-    *///    2: quaternion lerp (guaranteed orthogonal interpolations))
-    trans.processPointsAsync(threads,samplingStep,interpolationMode, approxMode);
-    if(writeMode == 0) {
-        timer::startTimer("readingTriangles");
-        objectReader::readTrianglesFromFile(argv[1]);
-        timer::stopTimer("readingTriangles");
-    }
+    if (transformation_mode == mode::ABORT) return -1;
     
-    trans.joinAndWritePoints(writeMode);
+    //reading all items for point processing
+    curveReader::readFromFile(conf.curve); 
+    objectReader::readPointsFromFile(conf.object); 
 
-    if(writeMode == 0) {
-        trans.createTriangles();
-        timer::startTimer("writeTriangles");
-        trans.writeTriangles();
-        timer::stopTimer("writeTriangles");
+    //preopening output files to process them faster async
+    writer::openFile(conf.outFile,TRANSFORMATION);
+    if(transformation_mode == mode::LIGHTPROFILE) {
+        writer::openFile(conf.lightTransFile,LIGHT_TRANSFORMED);
+        writer::openFile(conf.lightOrigFile,LIGHT_ORIGINAL);
     }
-    timer::stopTimer("gesamt");
+    transformer t = transformer(conf);
+
+    t.processPointsAsync();
+
+    //reading triangle data while handling points
+    objectReader::readTrianglesFromFile(conf.object);
+
+    //writing point data (async writes)
+    t.joinAndWritePoints();
+    if(transformation_mode == mode::LIGHTPROFILE) {
+        lightReader::readLightProfileFromFile(conf.profile);
+        t.createAndWriteLightProfileAsync();
+    }
+
+    //handling triangles
+    t.createTriangles();
+    t.writeTriangles();
+
     writer::writeTimes();
 
     return 0;

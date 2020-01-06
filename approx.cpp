@@ -23,6 +23,73 @@ double getDistanceLine(const dvec3 *point,const dvec3 *l1, const dvec3 *l2) {
     return length((*point - *l1) * (*point - *l2));
 }
 
+double getDistancePlane(const dvec3 *point,const dvec3 planePoint, const dvec3 planeNormal) {
+    return dot((planePoint - *point), planeNormal);
+}
+
+int approx::calculateEvolute(const plane *a,const plane *b, line* l)
+{
+    dvec3 u = a->normal * b->normal;
+    double ax = (u.x >= 0 ? u.x : -u.x);
+    double ay = (u.y >= 0 ? u.y : -u.y);
+    double az = (u.z >= 0 ? u.z : -u.z);
+
+    if ((ax+ay+az) < SMALL_NUM) {
+        dvec3   v = b->point -  a->point;
+        if (dot(a->normal, v) == 0) 
+            return 1;                  
+        else
+            return 0; 
+    }
+    int maxc; 
+    if (ax > ay) {
+        if (ax > az)
+             maxc =  1;
+        else maxc = 3;
+    }
+    else {
+        if (ay > az)
+             maxc =  2;
+        else maxc = 3;
+    }
+
+    dvec3 iP;                
+    double d1, d2;            
+    d1 = -dot(a->normal, a->point);  
+    d2 = -dot(b->normal, b->point); 
+
+    switch (maxc) {
+        case 1:
+            iP.x = 0;
+            iP.y = (d2*a->normal.z - d1*b->normal.z) /  u.x;
+            iP.z = (d1*b->normal.y - d2*a->normal.y) /  u.x;
+            break;
+        case 2:                     
+            iP.x = (d1*b->normal.z - d2*a->normal.z) /  u.y;
+            iP.y = 0;
+            iP.z = (d2*a->normal.x - d1*b->normal.x) /  u.y;
+            break;
+        case 3:
+            iP.x = (d2*a->normal.y - d1*b->normal.y) /  u.z;
+            iP.y = (d1*b->normal.x - d2*a->normal.x) /  u.z;
+            iP.z = 0;
+    }
+    l->point1 = iP;
+    l->point2 = iP + u;
+    return 2;
+}
+
+double getRatio(const dvec3* point,dvec3 pointSegment,  const line* evolute, int mode) {
+    double evPoint = getDistanceLine(point, &evolute->point1, &evolute->point2);
+    double evSegment = getDistanceLine(&pointSegment, &evolute->point1, &evolute->point2);
+    double ratio = (evSegment/evPoint);
+    if(mode == INVERTED) {
+        return -ratio;
+    }
+    return ratio;
+
+}
+
 double bilinearApprox(double fa, double fb, double a, double b, cubicCurve* segment, const dvec3* p) {
     double half = a + (b-a)/2;
     if ((b-a) <= SMALL_NUM)

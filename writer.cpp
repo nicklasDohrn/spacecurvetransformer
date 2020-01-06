@@ -14,14 +14,33 @@
 using namespace glm;
 using namespace std;
 
-ofstream outFile;
+ofstream file[3];
 
 const int BUFFERSIZE = 100000;
-int writeMode;
 
-void writer::openFile(string path, int mode){
-    outFile.open(path);
-    writeMode = mode;
+void writer::openFile(string path, int fileType){
+    file[fileType].open(path);
+}
+
+void writer::writeLightPoints(vector<vec3>* points, int fileType){
+    std::string buffer;
+    for(int i = 0; i < points->size(); i++) {
+        if (buffer.length() + 100 >= BUFFERSIZE)
+            {
+                file[fileType] << buffer;
+                buffer.resize(0);
+            }
+            buffer.append("v ");
+            buffer.append(to_string((*points)[i].x));
+            buffer.append(1, ' ');
+            buffer.append(to_string((*points)[i].z));
+            buffer.append(1, ' ');
+            buffer.append(to_string(-(*points)[i].y));
+            buffer.append(1, ' ');
+            buffer.append(1, '\n');
+    }
+    buffer.append(1, '\n');
+    file[fileType] << buffer;
 }
 
 void writer::writePoints(vector< vector<newPoint> >* points) {
@@ -29,51 +48,13 @@ void writer::writePoints(vector< vector<newPoint> >* points) {
     vector<newPoint>* point_segment;
     std::string buffer;
     buffer.reserve(BUFFERSIZE);
-    if(writeMode == 1) {
-        vector<vector<dvec3>> orderedPoints = vector<vector<dvec3>>();
-        for(int i=0; i < points->size(); i++){
-            point_segment = &(*points)[i];
-            for(int j = 0; j < point_segment->size(); j++) {
-                if((*point_segment)[j].oldIndex >= orderedPoints.size()) {
-                    orderedPoints.resize((*point_segment)[j].oldIndex + 1);
-                }
-                orderedPoints[(*point_segment)[j].oldIndex].push_back(dvec3((*point_segment)[j].vector.x,(*point_segment)[j].vector.y,(*point_segment)[j].vector.z));
-            }
-        }
-        cout << "ordered points" << endl;
-
-            buffer.append(to_string(orderedPoints.size()));
-            buffer.append(1, '\n');
-        for(int i=0; i < orderedPoints.size(); i++){
-            buffer.append(to_string(i));
-            buffer.append(1, ' ');
-            for(int j = 0; j < orderedPoints[i].size(); j++) {
-                if (buffer.length() + 100 >= BUFFERSIZE)
-                {
-                    outFile << buffer;
-                    buffer.resize(0);
-                }
-                buffer.append(to_string(orderedPoints[i][j].x));
-                buffer.append(1, ' ');
-                buffer.append(to_string(orderedPoints[i][j].z));
-                buffer.append(1, ' ');
-                buffer.append(to_string(-orderedPoints[i][j].y));
-                buffer.append(1, ' ');
-            }
-            buffer.append(1, '\n');
-        }
-        outFile << buffer;
-        timer::stopTimer("writingpoints");
-        outFile.close();
-        return;
-    }
     cout << "writing points" << endl;
     for(int i=0; i < points->size(); i++){
         point_segment = &(*points)[i];
         for(int j = 0; j < point_segment->size(); j++) {
             if (buffer.length() + 100 >= BUFFERSIZE)
             {
-                outFile << buffer;
+                file[TRANSFORMATION] << buffer;
                 buffer.resize(0);
             }
             buffer.append("v ");
@@ -87,22 +68,18 @@ void writer::writePoints(vector< vector<newPoint> >* points) {
         }
     }
     buffer.append(1, '\n');
-    outFile << buffer;
+    file[TRANSFORMATION] << buffer;
     timer::stopTimer("writingpoints");
 }
 
 void writer::writeTriangles(vector< vector<int> >* triangles) {
-    if(writeMode != 0) {
-        cout << "omitting triangles in comparable mode" << endl;
-        return;
-    }
     cout << "writing triangles" << endl;
     std::string buffer;
     buffer.reserve(BUFFERSIZE);
     for(vector<int> newT : *triangles) {
             if (buffer.length() + 100 >= BUFFERSIZE)
             {
-                outFile << buffer;
+                file[TRANSFORMATION] << buffer;
                 buffer.resize(0);
             }
         buffer.append(1, 'f');
@@ -112,7 +89,7 @@ void writer::writeTriangles(vector< vector<int> >* triangles) {
         }
         buffer.append(1, '\n');
     }
-    outFile << buffer;
+    file[TRANSFORMATION] << buffer;
 }
 
 void writer::writeTimes() {

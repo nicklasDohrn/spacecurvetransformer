@@ -14,6 +14,7 @@
 #include <glm/gtx/vector_angle.hpp>
 #include "objectReader.h"
 #include "curveReader.h"
+#include "lightReader.h"
 #include "transformer.h"
 #include "writer.h"
 #include "types.h"
@@ -30,14 +31,16 @@ int base_pid, pid;
 int pageTableEntries;
 int relative_pid;
 int threadPages;
-int threadsUsed;
 thread t[100];
 thread writerThread;
+thread lightThread;
 
 vector< vector<newPoint> > pageTable;
 vector<vector<int>> newTriangles;
 vector<plane> *c;
 vector<dvec3> *p;
+vector<vec3> lightOldPoints;
+vector<vec3> lightNewPoints;
 
 
 double getDistancePlane(const dvec3 *point,const dvec3 *planePoint, const dvec3 *planeNormal) {
@@ -174,11 +177,11 @@ void checkArea (const plane *a,const plane *b,
 void handleChunk(int id, int chunkSize, int precision, int interPolationMode, int approxMode) {
     for(int i = chunkSize * id; i < chunkSize * (id + 1); i++) {
         if(i%1000==0) {
-            /*cout << "scanning Plane: " << (*c)[i].t << "t  (" 
+            cout << "scanning Plane: " << (*c)[i].t << "t  (" 
                 << (*c)[i].point.x << " " << (*c)[i].point.y << " " << (*c)[i].point.z << ")point  (" 
                 << (*c)[i].normal.x << " " << (*c)[i].normal.y << " " << (*c)[i].normal.z << ")normal  (" 
                 << (*c)[i].side.x << " " << (*c)[i].side.y << " " << (*c)[i].side.z << ")side  (" 
-                << (*c)[i].up.x << " " << (*c)[i].up.y << " " << (*c)[i].up.z << ")up" << endl;*/
+                << (*c)[i].up.x << " " << (*c)[i].up.y << " " << (*c)[i].up.z << ")up" << endl;
         }
         if(i%precision == 0 && (i+precision) >= c->size()) {
             checkArea(&((*c)[i]),&((*c)[c->size()-1]), p, id, interPolationMode, approxMode);
@@ -301,38 +304,37 @@ void addPointToTriangles(int page, int oldPointIndex, int newPointIndex, vector<
     }
 }
 
-void transformer::processPointsAsync(int threads, int precision, int interpolationMode, int approxMode){
+void transformer::processPointsAsync(){
     timer::startTimer("processingPoints");
     c = curveReader::getPlanes();
     p = objectReader::getPoints();
     int N = p->size();
-    threadsUsed = threads;
     int chunk;
     // Get the size of the work that each process will have to do.
-    chunk = (c->size() / threads) + 1;
+    chunk = (c->size() / config.threads) + 1;
     printf("curve size %d\n", c->size());
-    printf("using %d threads for %d points with precision %d \n", threads, N, precision);
+    printf("using %d threads for %d points with precision %d \n", config.threads, N, config.samplingStep);
     timer::setInfo("curve size", c->size());
-    timer::setInfo("threads", threads);
-    timer::setInfo("segmentlength", precision);
+    timer::setInfo("threads", config.threads);
+    timer::setInfo("segmentlength", config.samplingStep);
     timer::setInfo("points", N);
-    pageTableEntries = threads;
+    pageTableEntries = config.threads;
     
     //create pagetable and threadpositions
     pageTable.resize(pageTableEntries);
 
     //create threads
-    for (int i = 0; i < threadsUsed; i++) {
-        t[i] = thread(handleChunk, i, chunk, precision, interpolationMode, approxMode);
+    for (int i = 0; i < config.threads; i++) {
+        t[i] = thread(handleChunk, i, chunk, config.samplingStep, config.interpolationMode, config.approxMode);
     }
 }
 
-void transformer::joinAndWritePoints(int writemode) {
-    for (int i = 0; i < threadsUsed; i++) {
+void transformer::joinAndWritePoints() {
+    for (int i = 0; i < config.threads; i++) {
         t[i].join();         
     }
     timer::stopTimer("processingPoints");
-    if(writemode == 0)
+    if(config.writeMode == 0)
         writerThread = thread(writer::writePoints, &pageTable);
     else
         writer::writePoints(&pageTable);
@@ -369,4 +371,55 @@ void transformer::writeTriangles() {
     auto finish = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = finish - start;
     //cout << "writing triangles took: " << elapsed.count() << endl;
+    t[0].join();
+}
+
+float sign (vec3 p1, vec3 p2, vec3 p3)
+{
+    return (p1.y - p3.y) * (p2.z - p3.z) - (p2.y - p3.y) * (p1.z - p3.z);
+}
+
+bool pointInTriangle (vec3 pt, vec3 v1, vec3 v2, vec3 v3)
+{
+    float d1, d2, d3;
+    bool has_neg, has_pos;
+
+    d1 = sign(pt, v1, v2);
+    d2 = sign(pt, v2, v3);
+    d3 = sign(pt, v3, v1);
+
+    has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+    has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+
+    return !(has_neg && has_pos);
+}
+
+void calculateLightroom(profile *pro) {
+    int oldFound[p->size()];
+    vector<newPoint>* point_segment;
+    for(int i=0; i < pageTable.size(); i++){
+        point_segment = &pageTable[i];
+        for(int j = 0; j < point_segment->size(); j++) {
+            for(int k = 0; k < pro->triangles.size(); k++) {
+                if(pointInTriangle((*point_segment)[j].vector, 
+                                    pro->points[pro->triangles[k][0]],
+                                    pro->points[pro->triangles[k][1]],
+                                    pro->points[pro->triangles[k][2]])){
+                                        
+                    lightNewPoints.push_back((*point_segment)[j].vector);
+                    if(!oldFound[(*point_segment)[j].oldIndex]){
+                        lightOldPoints.push_back((*p)[(*point_segment)[j].oldIndex]);
+                    }
+                }
+            }
+        }
+    }
+    writer::writeLightPoints(&lightNewPoints,LIGHT_TRANSFORMED);
+    writer::writeLightPoints(&lightOldPoints,LIGHT_ORIGINAL);
+    cout << "finished profile" << endl;
+}
+
+void transformer::createAndWriteLightProfileAsync() {
+    profile *p = lightReader::getProfile();
+    t[0] = thread(calculateLightroom, p);
 }

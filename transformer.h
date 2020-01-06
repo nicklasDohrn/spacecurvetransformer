@@ -16,9 +16,15 @@ using namespace std;
 
 class transformer 
 {
+   private:
+        progConfig config;
    public: 
-        void processPointsAsync(int thread, int precision, int interpolationMode, int approximationMode);
-        void joinAndWritePoints(int writemode);
+        transformer(progConfig conf) {
+            config = conf;
+        };
+        void processPointsAsync();
+        void joinAndWritePoints();
+        void createAndWriteLightProfileAsync();
         void createTriangles();
         void writeTriangles();
 };
