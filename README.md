@@ -2,11 +2,15 @@
 Transformation of Triangular-Meshes along Spacecurves
 
 ### About
-This is the final implementation for the Bachelorthesis
+This is the improved implementation for the Bachelorthesis
 
 **Transformation von Dreiecksnetzen entlang von Raumkurven**
 
+the original Implementation at the time of the Bachelorthesis can be found under:
 
+[Original Implementation](https://github.com/nicklasDohrn/spacecurvetransformer/tree/original)
+
+Please note, that this Version is far superior in usability and functional depth, so i highly recommend using the current improved version.
 
 This implementation is written in C++ and needs the GLM Library to work properly.
 it can be build via make:
